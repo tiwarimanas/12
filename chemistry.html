@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Van't Hoff Factor Simulation</title>
+    
+    <!-- Animation Library: p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    
+    <!-- LaTeX Rendering Library: KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --light-bg: #f0f4f8;
+            --white-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #bdc3c7;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+            overflow: hidden; /* Prevent body scroll on desktop */
+        }
+        
+        /* --- Opening Splash Screen --- */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--secondary-color);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+            animation: fadeOutSplashScreen 3s forwards 1s;
+        }
+        #splash-text {
+            color: white; font-size: 2.5em; font-weight: bold; text-align: center;
+            letter-spacing: 2px;
+            animation: fadeInText 2s forwards;
+        }
+        @keyframes fadeInText { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOutSplashScreen { 0%, 75% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+
+        /* --- Main App Layout Structure --- */
+        #app-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            text-align: center;
+            padding: 15px 0;
+            margin: 0;
+            flex-shrink: 0; /* Prevent h1 from shrinking */
+        }
+        
+        /* Default Mobile Layout: Single column, natural height */
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 0 15px 15px 15px;
+            overflow-y: auto; /* Allow scrolling on mobile */
+        }
+        
+        #simulation-container, #results-container {
+            background-color: var(--white-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            padding: 20px;
+        }
+
+        #canvas-wrapper {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        #controls { display: flex; flex-direction: column; gap: 15px; }
+        label { font-weight: bold; margin-bottom: 5px; color: #34495e; }
+        select, input[type="range"] {
+            width: 100%; padding: 10px; border: 1px solid #ccc;
+            border-radius: 5px; font-size: 16px; box-sizing: border-box;
+        }
+        button {
+            padding: 12px 20px; font-size: 16px; font-weight: bold;
+            color: #fff; background-color: var(--primary-color);
+            border: none; border-radius: 5px; cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        button:hover { background-color: #2980b9; }
+        button:active { transform: scale(0.98); }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+
+        #results-container h2 {
+            margin-top: 0; color: var(--secondary-color);
+            border-bottom: 2px solid var(--primary-color); padding-bottom: 10px;
+        }
+
+        .step {
+            opacity: 0; transform: translateY(10px);
+            transition: opacity 0.5s, transform 0.5s;
+            margin-bottom: 15px; font-size: 1.1em; line-height: 1.6;
+        }
+        .step.visible { opacity: 1; transform: translateY(0); }
+        .katex-display { margin: 0.8em 0; }
+        
+        /* --- Desktop Layout: Two-column, full-height --- */
+        @media (min-width: 1024px) {
+            body { overflow: hidden; } /* Lock body scroll on desktop */
+            
+            #main-container {
+                flex-direction: row; /* Side-by-side */
+                flex-grow: 1; /* Take all available vertical space */
+                padding: 0 20px 20px 20px;
+                overflow: hidden;
+            }
+            
+            #simulation-container {
+                flex: 6; /* 60% width */
+                display: flex;
+                flex-direction: column;
+            }
+            
+            #results-container {
+                flex: 4; /* 40% width */
+                display: flex;
+                flex-direction: column;
+                overflow: hidden; /* Hide outer scroll */
+            }
+
+            #canvas-wrapper {
+                flex-grow: 1; /* Canvas area takes all available space */
+                width: auto;
+                aspect-ratio: auto;
+                margin-bottom: 15px;
+            }
+
+            #log {
+                flex-grow: 1; /* Log area takes all space */
+                overflow-y: auto; /* Enable internal scrolling */
+                padding-right: 10px; /* Space for scrollbar */
+                scrollbar-width: thin;
+                scrollbar-color: var(--primary-color) var(--light-bg);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash-screen"><div id="splash-text">THIS IS MANAS TIWARI's Project</div></div>
+
+    <div id="app-wrapper">
+        <h1>Van't Hoff Factor Simulation</h1>
+        <div id="main-container">
+            <div id="simulation-container">
+                <div id="canvas-wrapper"></div>
+                <div id="controls">
+                    <div class="control-group">
+                        <label for="solute-select">Choose a Solute:</label>
+                        <select id="solute-select">
+                            <option value="sugar">Sucrose (C₁₂H₂₂O₁₁)</option>
+                            <option value="nacl">Sodium Chloride (NaCl)</option>
+                            <option value="cacl2">Calcium Chloride (CaCl₂)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="molality-slider">Molality (m): <span id="molality-value">1.00</span> m</label>
+                        <input type="range" id="molality-slider" min="0.1" max="2.0" step="0.05" value="1.0">
+                    </div>
+                    <button id="start-button">Start Experiment</button>
+                    <button id="reset-button" disabled>Reset</button>
+                </div>
+            </div>
+
+            <div id="results-container">
+                <h2>Experiment Log & Calculation</h2>
+                <div id="log">
+                    <p class="step" id="step0"></p> <p class="step" id="step1"></p> <p class="step" id="step2"></p>
+                    <p class="step" id="step3"></p> <p class="step" id="step4"></p> <p class="step" id="step5"></p>
+                    <p class="step" id="step6"></p> <p class="step" id="step7"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const soluteSelect = document.getElementById('solute-select');
+            const molalitySlider = document.getElementById('molality-slider');
+            const molalityValueSpan = document.getElementById('molality-value');
+            const startButton = document.getElementById('start-button');
+            const resetButton = document.getElementById('reset-button');
+            const logSteps = Array.from(document.querySelectorAll('#log .step'));
+            
+            let state = 'IDLE';
+            const PURE_SOLVENT_FP = 0, KF = 1.86;
+            let temperature, molality, soluteInfo, targetSolutionFP, measuredSolventFP, measuredSolutionFP;
+            let particles = [], animationTimer = 0;
+
+            const SOLUTES = {
+                sugar: { name: 'Sucrose', formula: 'C_{12}H_{22}O_{11}', i: 1, 
+                    ions: [{ name: 'C₁₂H₂₂O₁₁', color: [220, 50, 220], radius: 7 }] },
+                nacl: { name: 'Sodium Chloride', formula: 'NaCl', i: 2, 
+                    ions: [
+                        { name: 'Na⁺', color: [50, 220, 50], radius: 5 },
+                        { name: 'Cl⁻', color: [255, 255, 100], radius: 6 }
+                    ] },
+                cacl2: { name: 'Calcium Chloride', formula: 'CaCl_2', i: 3, 
+                    ions: [
+                        { name: 'Ca^{2+}', color: [255, 165, 0], radius: 6 },
+                        { name: 'Cl^{-}', color: [255, 255, 100], radius: 6 },
+                        { name: 'Cl^{-}', color: [255, 255, 100], radius: 6 }
+                    ] },
+            };
+
+            const sketch = (p) => {
+                p.setup = () => {
+                    const wrapper = document.getElementById('canvas-wrapper');
+                    const canvas = p.createCanvas(wrapper.offsetWidth, wrapper.offsetHeight);
+                    canvas.parent('canvas-wrapper');
+                    p.frameRate(60);
+                    resetSimulation();
+                };
+
+                p.draw = () => {
+                    p.background(236, 240, 241);
+                    drawBeaker(p);
+                    drawThermometer(p);
+                    handleStates(p);
+                    updateParticles(p);
+                    drawParticles(p);
+                    let liquidIsFrozen = (state === 'FROZEN_SOLVENT' || state === 'FROZEN_SOLUTION' || state === 'CALCULATING');
+                    drawLiquid(p, liquidIsFrozen);
+                };
+                
+                p.windowResized = () => {
+                    const wrapper = document.getElementById('canvas-wrapper');
+                    p.resizeCanvas(wrapper.offsetWidth, wrapper.offsetHeight);
+                }
+            };
+
+            function handleStates(p) {
+                switch (state) {
+                    case 'COOLING_SOLVENT':
+                        temperature -= 0.05;
+                        if (temperature <= PURE_SOLVENT_FP) {
+                            temperature = PURE_SOLVENT_FP;
+                            measuredSolventFP = PURE_SOLVENT_FP;
+                            state = 'FROZEN_SOLVENT';
+                            showStep(2, `Pure solvent (water) frozen at <strong>${measuredSolventFP.toFixed(2)} °C</strong>.`);
+                            animationTimer = p.millis() + 2000;
+                        }
+                        break;
+                    case 'FROZEN_SOLVENT':
+                        if (p.millis() > animationTimer) {
+                           state = 'ADDING_SOLUTE';
+                           const formula = `$${soluteInfo.formula}$`;
+                           showStep(3, `Adding ${molality.toFixed(2)} m of <strong>${soluteInfo.name}</strong> (${formula}).`);
+                           createParticles(p);
+                           animationTimer = p.millis() + 1000;
+                        }
+                        break;
+                    case 'ADDING_SOLUTE':
+                        if (p.millis() > animationTimer) {
+                            state = 'COOLING_SOLUTION';
+                            temperature = 10;
+                            showStep(4, 'Dissolving solute and cooling the new solution...');
+                        }
+                        break;
+                    case 'COOLING_SOLUTION':
+                        temperature -= 0.05;
+                        if (temperature <= targetSolutionFP) {
+                            temperature = targetSolutionFP;
+                            measuredSolutionFP = targetSolutionFP;
+                            state = 'FROZEN_SOLUTION';
+                            showStep(5, `Solution froze at <strong>${measuredSolutionFP.toFixed(2)} °C</strong>.`);
+                            animationTimer = p.millis() + 1500;
+                        }
+                        break;
+                    case 'FROZEN_SOLUTION':
+                        if (p.millis() > animationTimer) {
+                            state = 'CALCULATING';
+                            startCalculation();
+                        }
+                        break;
+                }
+            }
+            
+            function drawBeaker(p) { /* Drawing functions are adaptive to canvas size */
+                const w = p.width, h = p.height;
+                p.stroke(127, 140, 141); p.strokeWeight(3); p.noFill();
+                p.line(w*0.25, h*0.3, w*0.25, h*0.9); p.line(w*0.75, h*0.3, w*0.75, h*0.9);
+                p.line(w*0.25, h*0.9, w*0.75, h*0.9);
+            }
+            function drawLiquid(p, isFrozen) {
+                const w = p.width, h = p.height;
+                p.noStroke();
+                if (isFrozen) p.fill(173, 216, 230, 200); else p.fill(52, 152, 219, 150);
+                p.rect(w*0.25+2, h*0.5, w*0.5-3, h*0.4-1);
+            }
+            function drawThermometer(p) {
+                const w = p.width, h = p.height; const thermX = w * 0.85;
+                p.stroke(52, 73, 94); p.strokeWeight(2); p.fill(255);
+                p.rect(thermX - w*0.025, h*0.2, w*0.05, h*0.65); p.ellipse(thermX, h*0.85 + w*0.05, w*0.1, w*0.1);
+                p.strokeWeight(1);
+                for (let t = 10; t >= -12; t -= 2) {
+                    let y = p.map(t, 12, -14, h*0.2, h*0.85);
+                    p.line(thermX - w*0.025, y, thermX - w*0.0125, y);
+                    p.noStroke(); p.fill(0); p.textAlign(p.LEFT, p.CENTER); p.textSize(w*0.03);
+                    p.text(`${t}°`, thermX + w*0.04, y); p.stroke(52, 73, 94);
+                }
+                p.noStroke(); p.fill(231, 76, 60);
+                let tempHeight = p.map(temperature, 12, -14, h*0.2, h*0.85);
+                p.rect(thermX - w*0.0125, tempHeight, w*0.025, (h*0.85 + w*0.0375) - tempHeight);
+                p.ellipse(thermX, h*0.85 + w*0.05, w*0.075, w*0.075);
+            }
+            
+            function createParticles(p) {
+                particles = []; const w = p.width, h = p.height;
+                const numFormulaUnits = Math.min(15, Math.floor(molality * 4));
+                for (let i = 0; i < numFormulaUnits; i++) {
+                    for (const ion of soluteInfo.ions) {
+                        particles.push({
+                            x: p.random(w*0.25 + 10, w*0.75 - 10), y: p.random(h*0.5 + 10, h*0.9 - 10),
+                            vx: p.random(-0.5, 0.5), vy: p.random(-0.5, 0.5),
+                            color: ion.color, radius: ion.radius
+                        });
+                    }
+                }
+            }
+            function updateParticles(p) {
+                if (!['ADDING_SOLUTE', 'COOLING_SOLUTION'].includes(state)) return;
+                const w = p.width, h = p.height;
+                const b = { l: w*0.25, r: w*0.75, t: h*0.5, b: h*0.9 };
+                for (let pt of particles) {
+                    pt.x += pt.vx; pt.y += pt.vy;
+                    if (pt.x < b.l + pt.radius || pt.x > b.r - pt.radius) pt.vx *= -1;
+                    if (pt.y < b.t + pt.radius || pt.y > b.b - pt.radius) pt.vy *= -1;
+                }
+            }
+            function drawParticles(p) {
+                p.noStroke();
+                for (const pt of particles) {
+                    p.fill(pt.color); p.ellipse(p.min(p.max(pt.x, 0), p.width), p.min(p.max(pt.y, 0), p.height), pt.radius * 2);
+                }
+            }
+
+            function updateUI() {
+                molalityValueSpan.textContent = parseFloat(molalitySlider.value).toFixed(2);
+                const isRunning = (state !== 'IDLE' && state !== 'CALCULATING');
+                startButton.disabled = isRunning; resetButton.disabled = state === 'IDLE';
+                soluteSelect.disabled = isRunning; molalitySlider.disabled = isRunning;
+            }
+            function clearLog() {
+                logSteps.forEach(step => { step.innerHTML = ''; step.classList.remove('visible'); });
+            }
+            function showStep(index, message) {
+                const stepElement = logSteps[index];
+                if (!stepElement) return;
+                stepElement.innerHTML = message;
+                // ** CRITICAL FIX FOR LATEX **
+                // Render math only in the element that was just updated.
+                if (window.renderMathInElement) {
+                    window.renderMathInElement(stepElement, {
+                        delimiters: [ {left: "$$", right: "$$", display: true}, {left: "$", right: "$", display: false} ]
+                    });
+                }
+                stepElement.classList.add('visible');
+            }
+            function resetSimulation() {
+                state = 'IDLE'; temperature = 10; particles = []; animationTimer = 0;
+                clearLog();
+                showStep(0, 'Set up your experiment and press "Start".');
+                updateUI();
+            }
+            function startExperiment() {
+                resetSimulation();
+                molality = parseFloat(molalitySlider.value); soluteInfo = SOLUTES[soluteSelect.value];
+                targetSolutionFP = PURE_SOLVENT_FP - (soluteInfo.i * KF * molality);
+                state = 'COOLING_SOLVENT';
+                clearLog();
+                showStep(1, `Starting... Cooling pure solvent (Water, $H_2O$).`);
+                updateUI();
+            }
+            function startCalculation() {
+                 const deltaTf_obs = measuredSolventFP - measuredSolutionFP;
+                 const i_calc = deltaTf_obs / (KF * molality);
+                 showStep(6, `<strong>1. Find Freezing Point Depression ($\\Delta T_f$):</strong>
+                    $$ \\Delta T_f = T_{f, \\text{solvent}} - T_{f, \\text{solution}} $$
+                    $$ \\Delta T_f = ${measuredSolventFP.toFixed(2)}^\\circ C - (${measuredSolutionFP.toFixed(2)}^\\circ C) = \\mathbf{${deltaTf_obs.toFixed(2)}^\\circ C} $$`);
+                 setTimeout(() => {
+                    showStep(7, `<strong>2. Calculate Van't Hoff factor (i):</strong>
+                    $$ i = \\frac{\\Delta T_f}{K_f \\cdot m} $$
+                    $$ i = \\frac{${deltaTf_obs.toFixed(2)}}{${KF} \\cdot ${molality.toFixed(2)}} = \\mathbf{${i_calc.toFixed(2)}} $$
+                    (Theoretical 'i' for ${soluteInfo.name} is ${soluteInfo.i})`);
+                 }, 2000);
+                 updateUI();
+            }
+            
+            document.getElementById('splash-screen').addEventListener('animationend', (e) => {
+                if (e.animationName === 'fadeOutSplashScreen') e.target.style.display = 'none';
+            });
+            molalitySlider.addEventListener('input', updateUI);
+            startButton.addEventListener('click', startExperiment);
+            resetButton.addEventListener('click', resetSimulation);
+            
+            new p5(sketch);
+        });
+    </script>
+</body>
+</html>

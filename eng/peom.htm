@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Class 12 Flamingo Poems — Neon Block Theme (GSAP)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- GSAP CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <style>
+    :root{
+      /* Neon Block Theme */
+      --bg: #0b0d10;           /* base */
+      --panel: #10141a;        /* panels */
+      --tile: #141a22;         /* cards */
+      --text: #f4f6fb;         /* primary text */
+      --muted: #b9c3d6;        /* muted text */
+
+      --green: #00f7a6;        /* neon green */
+      --pink:  #ff8fc1;        /* soft neon pink */
+      --yellow:#ffe36e;        /* pastel yellow */
+      --cyan:  #58e6ff;        /* cyan accent */
+
+      --ring: rgba(0,247,166,0.28);
+      --edge: rgba(255,255,255,0.07);
+    }
+
+    /* Global reset + no scrollbars */
+    *{box-sizing:border-box}
+    html,body{
+      height:100%;
+      margin:0;
+      background: var(--bg);
+      color:var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow:hidden; /* hard stop for any scrollbar */
+    }
+
+    /* Background decor (subtle squares) */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      background:
+        linear-gradient(0deg, rgba(255,255,255,0.02), rgba(255,255,255,0.02)) 0 0/8px 8px,
+        radial-gradient(600px 300px at 80% 10%, rgba(0,247,166,0.06), transparent 60%),
+        radial-gradient(500px 260px at 10% 80%, rgba(255,143,193,0.08), transparent 60%);
+      pointer-events:none;
+    }
+
+    .app{
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px; /* tight to avoid overflow */
+    }
+
+    .frame{
+      width:min(1100px, 96vw);
+      height:min(640px, 92vh);
+      background: var(--panel);
+      border:1px solid var(--edge);
+      border-radius:14px;
+      position:relative;
+      overflow:hidden; /* contain everything, no inner scroll */
+      box-shadow:
+        0 18px 48px rgba(0,0,0,0.45),
+        0 0 0 6px rgba(0,0,0,0.12) inset;
+    }
+
+    .slides{
+      position:relative;
+      width:100%;
+      height:100%;
+      padding:10px 10px 56px 10px; /* compact bottom for nav */
+      display:grid;
+      grid-template-rows:auto 1fr;
+      gap:6px;
+      z-index:1;
+    }
+
+    /* Top bar */
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      min-height:34px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:800; letter-spacing:.2px;
+      font-size: clamp(13px, 2.2vw, 16px);
+    }
+    .brand .mark{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:18px; height:18px; border-radius:3px;
+      background: var(--green);
+      color:#08110d; font-weight:900;
+      box-shadow:0 0 0 6px var(--ring);
+    }
+
+    /* Rectangular progress “chips” */
+    .progress{display:flex;gap:6px;align-items:center}
+    .prog-dot{
+      height:10px; width:18px; border-radius:3px;
+      background:#222a34; border:1px solid var(--edge); opacity:.7;
+      transition:all .25s ease; cursor:pointer;
+    }
+    .prog-dot.active{
+      width:32px; opacity:1;
+      background: linear-gradient(90deg, var(--green), var(--pink));
+      box-shadow:0 0 0 6px var(--ring);
+    }
+
+    /* Viewport */
+    .viewport{
+      position:relative;
+      width:100%;
+      height:100%;
+      overflow:hidden;          /* never scroll */
+      border-radius:12px;
+      border:1px solid var(--edge);
+      background:linear-gradient(180deg, #0f141a, #121821);
+    }
+
+    /* Slides */
+    .slide{
+      position:absolute; inset:0; padding:20px 22px;
+      display:none; opacity:0; visibility:hidden; pointer-events:none;
+    }
+    .slide.active{display:block; opacity:1; visibility:visible; pointer-events:auto;}
+
+    /* Title row */
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:5px 10px; border-radius:6px; font-size:11px; letter-spacing:.3px; text-transform:uppercase;
+      color:#091115; background:var(--green); font-weight:900;
+    }
+    .badge .pill{
+      display:inline-block; padding:.5px 7px; border-radius:4px;
+      background:#091115; color:var(--green); border:1px solid #0a1e17;
+      font-weight:800; font-size:10px;
+    }
+    h1{
+      margin:6px 0 6px 0;
+      font-size: clamp(18px, 2.4vw, 24px);
+      line-height:1.25; letter-spacing:.2px;
+    }
+    .meta{
+      color:var(--muted); font-size:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    }
+    .meta .chip{
+      background:#1a202b; color:#d9e1f0; border:1px solid var(--edge);
+      padding:5px 8px; border-radius:8px; font-weight:700; font-size:11px;
+    }
+
+    /* Content grid */
+    .content{
+      border-top:2px solid #1b222d;
+      margin-top:8px; padding-top:12px;
+      display:grid; grid-template-columns:1.15fr .85fr; gap:14px;
+      max-height: calc(100% - 108px); /* keep within slide */
+    }
+    .content.single{grid-template-columns:1fr;}
+    .lead{font-size:14px; color:#e9f0fb; line-height:1.5;}
+    ul{margin:0;padding-left:16px; display:grid; gap:8px; list-style:disc}
+    li{
+      background:var(--tile);
+      border:1px solid var(--edge);
+      padding:8px 10px; border-radius:10px; color:#eef2fb; font-size:14px;
+      box-shadow: 6px 6px 0 0 rgba(0,247,166,0.08);
+    }
+
+    /* Aside block with neon stripes */
+    .aside{
+      background:linear-gradient(145deg, rgba(255,143,193,0.12), rgba(0,247,166,0.12));
+      border:1px solid var(--edge);
+      border-radius:10px; padding:10px; color:#dfe6f5; font-size:13px;
+      position:relative; overflow:hidden;
+    }
+    .aside::after{
+      content:"";
+      position:absolute; right:-24px; top:-24px; width:120px; height:120px; transform:rotate(45deg);
+      background: repeating-linear-gradient(90deg, rgba(0,247,166,0.18), rgba(0,247,166,0.18) 6px, transparent 6px, transparent 12px);
+      opacity:.3; pointer-events:none;
+    }
+    .aside h3{margin:0 0 6px 0; font-size:13px; color:#d0f7ea;}
+    .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+    .grid-2 > div{
+      background:#10151b; border:1px solid var(--edge); border-radius:8px; padding:6px 8px; font-size:12px;
+    }
+
+    /* Credit tag */
+    .credit{
+      position:absolute; right:10px; top:8px; z-index:2; font-size:11px; color:#091115; display:flex; align-items:center; gap:6px;
+      background:var(--yellow); padding:5px 8px; border-radius:6px; border:1px solid rgba(0,0,0,0.12);
+      box-shadow:4px 4px 0 0 rgba(255,227,110,0.25);
+      font-weight:900;
+    }
+
+    /* Navigation */
+    .nav{
+      position:absolute; left:10px; right:10px; bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    }
+    .btn{
+      display:inline-flex; gap:8px; align-items:center; justify-content:center; min-width:118px;
+      padding:9px 14px; border-radius:8px; border:2px solid var(--green);
+      background:#0b1217; color:var(--green); font-weight:900; cursor:pointer; transition:.15s ease transform, .15s ease box-shadow;
+      letter-spacing:.3px; text-transform:uppercase; font-size:14px;
+      box-shadow:6px 6px 0 0 rgba(0,247,166,0.18);
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow:8px 8px 0 0 rgba(0,247,166,0.22)}
+    .btn:active{transform:translateY(0)}
+    .btn.primary{background:var(--green); color:#08110d; border-color:var(--green); box-shadow:6px 6px 0 0 rgba(255,143,193,0.28)}
+
+    @media (max-width: 900px){
+      .content{grid-template-columns:1fr}
+      .grid-2{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="frame" id="frame">
+      <div class="slides">
+        <div class="topbar" role="toolbar" aria-label="Slide controls">
+          <div class="brand">
+            <span class="mark">F</span>
+            <span>Flamingo • Class 12 Poetry</span>
+          </div>
+          <div class="progress" id="progress" aria-label="Slide progress"></div>
+        </div>
+
+        <div class="viewport" id="viewport" role="region" aria-live="polite" aria-label="Slide content">
+          <!-- ========== POEM 1: MY MOTHER AT SIXTY-SIX (Kamala Das) ========== -->
+          <!-- 1.1 Summary -->
+          <section class="slide active" data-poem="1" data-kind="summary" data-title="My Mother at Sixty-Six — Summary">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Summary</span> My Mother at Sixty‑Six • Kamala Das</span>
+              <h1>Ageing, parting, and a daughter’s quiet courage</h1>
+              <div class="meta">
+                <span class="chip">Setting: drive to Cochin airport</span>
+                <span class="chip">Tone: tender, anxious, restrained</span>
+              </div>
+              <div class="content">
+                <div class="lead">
+                  <ul>
+                    <li>While driving to the Cochin airport, the poet sees her sixty‑six‑year‑old mother dozing with an open mouth, her face pale and ashen like a corpse, which pierces her heart with the fear of mortality.</li>
+                    <li>She averts her gaze to the world outside—”young trees sprinting” and “merry children spilling out of their homes”—a vivid contrast of vitality against her mother’s frailty.</li>
+                    <li>At the airport, the mother’s face seems wan and “pale as a late winter’s moon,” reviving the poet’s “old, familiar ache,” yet she chooses to smile and say “see you soon, Amma” to mask her dread.</li>
+                    <li>The poem captures the universal anxiety of separation, love, and ageing through restrained images and quiet resolve.</li>
+                  </ul>
+                </div>
+                <aside class="aside">
+                  <h3>Key lines</h3>
+                  <div class="grid-2">
+                    <div>“Her face ashen like that of a corpse”</div>
+                    <div>“…pale as a late winter’s moon”</div>
+                    <div>“Young trees sprinting”</div>
+                    <div>“…merry children spilling out”</div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- 1.2 Poetic Devices -->
+          <section class="slide" data-poem="1" data-kind="devices" data-title="My Mother at Sixty-Six — Poetic Devices">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Devices</span> My Mother at Sixty‑Six • Kamala Das</span>
+              <h1>Images of life versus the pallor of age</h1>
+              <div class="content single">
+                <ul>
+                  <li>Simile: “ashen like that of a corpse,” “pale as a late winter’s moon.”</li>
+                  <li>Imagery: rapid “young trees” and “merry children” heighten the life–death contrast.</li>
+                  <li>Contrast/Juxtaposition: bright, kinetic outside world versus the mother’s stillness.</li>
+                  <li>Symbolism: “late winter’s moon” suggests waning vitality and dimmed radiance.</li>
+                  <li>Enjambment: flowing syntax mirrors the poet’s continuous thought and suppressed emotion.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- 1.3 PYQs -->
+          <section class="slide" data-poem="1" data-kind="pyq" data-title="My Mother at Sixty-Six — CBSE PYQs">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">CBSE PYQs</span> My Mother at Sixty‑Six</span>
+              <h1>Frequently asked board‑style questions</h1>
+              <div class="content single">
+                <ul>
+                  <li>What is the significance of the image “pale as a late winter’s moon” in the poem?</li>
+                  <li>How does the poet’s “old, familiar ache” relate to childhood fear and present anxiety?</li>
+                  <li>Explain how the outside images of “young trees” and “merry children” deepen the poem’s core theme.</li>
+                  <li>How does the poet mask her dread at parting, and why is that important to the tone?</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== POEM 2: KEEPING QUIET (Pablo Neruda) ========== -->
+          <!-- 2.1 Summary -->
+          <section class="slide" data-poem="2" data-kind="summary" data-title="Keeping Quiet — Summary">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Summary</span> Keeping Quiet • Pablo Neruda</span>
+              <h1>Silence for self‑reflection and renewal</h1>
+              <div class="meta">
+                <span class="chip">Count to twelve • stillness</span>
+                <span class="chip">Theme: humanity, peace, regeneration</span>
+              </div>
+              <div class="content">
+                <div class="lead">
+                  <ul>
+                    <li>The poet proposes a brief, universal pause—counting to twelve—where all speech and activity cease to enable self‑introspection and a shared “exotic moment” of calm.</li>
+                    <li>This silence is not “total inactivity”; rather, it halts harmful pursuits and mindless rush so humanity can reconsider its actions and heal itself and the earth.</li>
+                    <li>By stepping out of routine aggression—industry, conflict, exploitation—people can rediscover empathy and the purpose of their work and living.</li>
+                    <li>The pause serves as a metaphorical rebirth, inviting a better rhythm of life rooted in awareness and care.</li>
+                  </ul>
+                </div>
+                <aside class="aside">
+                  <h3>Keywords</h3>
+                  <div class="grid-2">
+                    <div>“Exotic moment”</div>
+                    <div>Self‑introspection</div>
+                    <div>Universal stillness</div>
+                    <div>Not total inactivity</div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2.2 Poetic Devices -->
+          <section class="slide" data-poem="2" data-kind="devices" data-title="Keeping Quiet — Poetic Devices">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Devices</span> Keeping Quiet • Pablo Neruda</span>
+              <h1>Minimalism that imagines a shared pause</h1>
+              <div class="content single">
+                <ul>
+                  <li>Symbolism: “counting to twelve” as a symbol of worldwide unity and a reset.</li>
+                  <li>Imagery: silence of nature and cessation of urban noise evoke an “exotic moment.”</li>
+                  <li>Anaphora and imperative mood: repeated calls to “keep quiet” and abstain from harm guide collective action.</li>
+                  <li>Contrast: silence versus the “mad rush” spotlights destructive habits and their remedy.</li>
+                  <li>Tone: persuasive yet meditative, balancing urgency with hope.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2.3 PYQs -->
+          <section class="slide" data-poem="2" data-kind="pyq" data-title="Keeping Quiet — CBSE PYQs">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">CBSE PYQs</span> Keeping Quiet</span>
+              <h1>Frequently asked board‑style questions</h1>
+              <div class="content single">
+                <ul>
+                  <li>What does the poet mean by calling the silence an “exotic moment,” and how does it transform people?</li>
+                  <li>Why does the poet warn against “total inactivity,” and how is his stillness different?</li>
+                  <li>How does the poem suggest that pausing harmful work can renew both humans and nature?</li>
+                  <li>Explain how symbolism and imagery work together to deliver the poem’s message.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== POEM 3: A THING OF BEAUTY (John Keats) ========== -->
+          <!-- 3.1 Summary -->
+          <section class="slide" data-poem="3" data-kind="summary" data-title="A Thing of Beauty — Summary">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Summary</span> A Thing of Beauty • John Keats</span>
+              <h1>Beauty as an endless, life‑giving source of joy</h1>
+              <div class="meta">
+                <span class="chip">Theme: solace in beauty</span>
+                <span class="chip">Image: “endless fountain of immortal drink”</span>
+              </div>
+              <div class="content">
+                <div class="lead">
+                  <ul>
+                    <li>Keats celebrates beauty as a constant wellspring of joy whose loveliness grows with contemplation and remains etched in memory.</li>
+                    <li>Despite despondence, cruelty, and the “gloom” of human life, beauty lifts the spirit like restorative shade or sweet dreams.</li>
+                    <li>Beauty pervades nature—sun, moon, trees, rills, flowers—and even heroic tales; it binds humanity to the living world like “flowery bands.”</li>
+                    <li>He images beauty as an “endless fountain of immortal drink,” suggesting inexhaustible nourishment for the soul.</li>
+                  </ul>
+                </div>
+                <aside class="aside">
+                  <h3>Symbols & images</h3>
+                  <div class="grid-2">
+                    <div>Flowery bands</div>
+                    <div>Shade and sweet sleep</div>
+                    <div>Sun, moon, rills</div>
+                    <div>Immortal fountain</div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3.2 Poetic Devices -->
+          <section class="slide" data-poem="3" data-kind="devices" data-title="A Thing of Beauty — Poetic Devices">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Devices</span> A Thing of Beauty • John Keats</span>
+              <h1>Sensuous imagery and sustaining metaphors</h1>
+              <div class="content single">
+                <ul>
+                  <li>Imagery: lush catalogues of natural beauty immerse the senses and calm the mind.</li>
+                  <li>Metaphor: “endless fountain of immortal drink” conveys beauty’s inexhaustible, life‑giving power.</li>
+                  <li>Alliteration and musicality: euphonic phrasing enhances the poem’s soothing effect.</li>
+                  <li>Contrast: beauty’s permanence versus life’s transient gloom and despair.</li>
+                  <li>Classical idealism: beauty as spiritual nourishment linking the human to the divine.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3.3 PYQs -->
+          <section class="slide" data-poem="3" data-kind="pyq" data-title="A Thing of Beauty — CBSE PYQs">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">CBSE PYQs</span> A Thing of Beauty</span>
+              <h1>Frequently asked board‑style questions</h1>
+              <div class="content single">
+                <ul>
+                  <li>What does Keats mean by “a thing of beauty is a joy forever,” and how does its loveliness increase?</li>
+                  <li>What removes the “pall from our dark spirits,” and why?</li>
+                  <li>Explain the metaphor “endless fountain of immortal drink.”</li>
+                  <li>List the natural images Keats uses to show the abundance of beauty, and explain their effect.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== POEM 4: A ROADSIDE STAND (Robert Frost) ========== -->
+          <!-- 4.1 Summary -->
+          <section class="slide" data-poem="4" data-kind="summary" data-title="A Roadside Stand — Summary">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Summary</span> A Roadside Stand • Robert Frost</span>
+              <h1>Rural hardship and urban indifference</h1>
+              <div class="meta">
+                <span class="chip">Theme: social‑economic critique</span>
+                <span class="chip">Images: polished traffic, wild berries, squash</span>
+              </div>
+              <div class="content">
+                <div class="lead">
+                  <ul>
+                    <li>A poor countryside family sets up a small stand by the highway, hoping for “city money,” but polished traffic speeds past with disdain or stops only for directions.</li>
+                    <li>Even when cars pause, buyers sneer at crude signs or admire scenery, ignoring the stall’s meagre produce like wild berries and crook‑necked squash.</li>
+                    <li>The poet condemns “greedy good‑doers” and “beneficent beasts of prey” who peddle false promises to the rural poor, trapping them in dependency.</li>
+                    <li>The speaker’s anguish at systemic neglect culminates in a desperate wish to end suffering at one stroke—only to recognize it as a childish, impossible thought.</li>
+                  </ul>
+                </div>
+                <aside class="aside">
+                  <h3>Focus</h3>
+                  <div class="grid-2">
+                    <div>City money vs rural want</div>
+                    <div>False promises</div>
+                    <div>Highway indifference</div>
+                    <div>Moral discomfort</div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4.2 Poetic Devices -->
+          <section class="slide" data-poem="4" data-kind="devices" data-title="A Roadside Stand — Poetic Devices">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Devices</span> A Roadside Stand • Robert Frost</span>
+              <h1>Satire sharpened by vivid everyday images</h1>
+              <div class="content single">
+                <ul>
+                  <li>Satire and irony: exposes hypocrisy of “greedy good‑doers” and urban apathy.</li>
+                  <li>Imagery: polished traffic, crude signage, wild berries, and squash set a concrete social scene.</li>
+                  <li>Contrast: rural need versus urban comfort underlines the economic divide.</li>
+                  <li>Tone shift: pity to moral outrage intensifies the critique of systemic neglect.</li>
+                  <li>Colloquial detail: roadside chatter and directions root the poem in lived reality.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4.3 PYQs -->
+          <section class="slide" data-poem="4" data-kind="pyq" data-title="A Roadside Stand — CBSE PYQs">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">CBSE PYQs</span> A Roadside Stand</span>
+              <h1>Frequently asked board‑style questions</h1>
+              <div class="content single">
+                <ul>
+                  <li>Who are the “greedy good‑doers” and “beneficent beasts of prey,” and why does the poet condemn them?</li>
+                  <li>How does the contrast between polished traffic and the poor stall dramatize the theme?</li>
+                  <li>Why do many car‑owners stop at the stand, and what do their reactions reveal?</li>
+                  <li>Explain how Frost uses imagery to indict social and economic indifference.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- ========== POEM 5: AUNT JENNIFER'S TIGERS (Adrienne Rich) ========== -->
+          <!-- 5.1 Summary -->
+          <section class="slide" data-poem="5" data-kind="summary" data-title="Aunt Jennifer’s Tigers — Summary">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Summary</span> Aunt Jennifer’s Tigers • Adrienne Rich</span>
+              <h1>Art of fearlessness amid marital oppression</h1>
+              <div class="meta">
+                <span class="chip">Symbols: tigers, wedding band</span>
+                <span class="chip">Theme: gendered power and resistance</span>
+              </div>
+              <div class="content">
+                <div class="lead">
+                  <ul>
+                    <li>Aunt Jennifer embroiders proud, prancing tigers—bold, sleek, and fearless in their green world—embodying the freedom she longs for.</li>
+                    <li>Her hands flutter with fear; the “massive weight of Uncle’s wedding band” signifies the oppressive burden of her marriage.</li>
+                    <li>Even in death she will be marked by the ordeals of domination, yet her tigers will go on “proud and unafraid,” preserving her inner desire for freedom.</li>
+                    <li>The poem juxtaposes enduring art against a life constrained by patriarchal power, making art a vehicle of resistance.</li>
+                  </ul>
+                </div>
+                <aside class="aside">
+                  <h3>Symbols</h3>
+                  <div class="grid-2">
+                    <div>Tigers: fearlessness</div>
+                    <div>Wedding ring: burden</div>
+                    <div>Embroidery: expression</div>
+                    <div>Forest: autonomy</div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <!-- 5.2 Poetic Devices -->
+          <section class="slide" data-poem="5" data-kind="devices" data-title="Aunt Jennifer’s Tigers — Poetic Devices">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">Devices</span> Aunt Jennifer’s Tigers • Adrienne Rich</span>
+              <h1>Symbolism that outlives oppression</h1>
+              <div class="content single">
+                <ul>
+                  <li>Symbolism: tigers as courage and self‑assertion; ring as patriarchal burden.</li>
+                  <li>Imagery: golden tigers, green world, fluttering fingers create contrast of power and fear.</li>
+                  <li>Alliteration and cadence: musical phrasing enhances the tigers’ proud movement.</li>
+                  <li>Juxtaposition: resilient art versus constrained life underscores the central irony.</li>
+                  <li>Tone: empathetic, critical, ultimately affirming through enduring art.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- 5.3 PYQs -->
+          <section class="slide" data-poem="5" data-kind="pyq" data-title="Aunt Jennifer’s Tigers — CBSE PYQs">
+            <div class="credit">by Manas Tiwari</div>
+            <div>
+              <span class="badge"><span class="pill">CBSE PYQs</span> Aunt Jennifer’s Tigers</span>
+              <h1>Frequently asked board‑style questions</h1>
+              <div class="content single">
+                <ul>
+                  <li>How do Aunt Jennifer’s tigers embody her aspirations for freedom and fearlessness?</li>
+                  <li>Explain the symbolism of the “massive weight” of the wedding band.</li>
+                  <li>Why will Aunt Jennifer not be “relieved” even after death, and what will remain of her?</li>
+                  <li>How does Rich contrast the tigers’ energy with Aunt Jennifer’s constrained life?</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="nav">
+          <button class="btn" id="prevBtn" aria-label="Previous slide">⟵ Prev</button>
+          <button class="btn primary" id="nextBtn" aria-label="Next slide">Next ⟶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Slides logic with GSAP animations (race-safe, no overlap)
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let index = slides.findIndex(s => s.classList.contains('active'));
+    if (index < 0) index = 0;
+    let isAnimating = false;
+
+    // Build progress chips
+    const progress = document.getElementById('progress');
+    progress.innerHTML = '';
+    slides.forEach((_, i) => {
+      const d = document.createElement('div');
+      d.className = 'prog-dot' + (i === index ? ' active' : '');
+      d.dataset.to = i;
+      d.title = 'Go to slide ' + (i + 1);
+      d.addEventListener('click', () => goTo(i));
+      progress.appendChild(d);
+    });
+
+    const setActiveDot = (i) => {
+      const dots = Array.from(document.querySelectorAll('.prog-dot'));
+      dots.forEach((el, n) => el.classList.toggle('active', n === i));
+    };
+
+    // Ensure only current is visible
+    slides.forEach((s, n) => {
+      const active = n === index;
+      s.classList.toggle('active', active);
+      s.style.display = active ? 'block' : 'none';
+      s.style.visibility = active ? 'visible' : 'hidden';
+      s.style.pointerEvents = active ? 'auto' : 'none';
+      if (!active) gsap.set(s, {opacity:0, x:0});
+    });
+
+    function animateIn(slideEl, dir){
+      gsap.set(slideEl, {opacity:0, x:42*dir});
+      return gsap.timeline()
+        .to(slideEl, {opacity:1, x:0, duration:.55, ease:'power3.out'}, 0)
+        .from(slideEl.querySelectorAll('.badge, h1, .meta .chip'), {y:14, opacity:0, stagger:.05, duration:.45, ease:'power3.out'}, '-=.32')
+        .from(slideEl.querySelectorAll('.lead li, .aside, .aside .grid-2 > *'), {y:12, opacity:0, stagger:.04, duration:.4, ease:'power3.out'}, '-=.28');
+    }
+
+    function animateOut(slideEl, dir){
+      return gsap.timeline()
+        .to(slideEl, {opacity:0, x:-42*dir, duration:.45, ease:'power3.inOut'}, 0);
+    }
+
+    function show(next, dir=1){
+      if (isAnimating || next === index) return;
+      isAnimating = true;
+
+      const prev = index;
+      const prevSlide = slides[prev];
+      const nextSlide = slides[next];
+
+      // Kill tweens for both slides and children before animating
+      gsap.killTweensOf([prevSlide, nextSlide]);
+      gsap.killTweensOf(prevSlide.querySelectorAll('*'));
+      gsap.killTweensOf(nextSlide.querySelectorAll('*'));
+
+      // Prep visibility for next
+      nextSlide.style.display = 'block';
+      nextSlide.style.visibility = 'visible';
+      nextSlide.style.pointerEvents = 'auto';
+
+      const outTl = animateOut(prevSlide, dir);
+      const inTl  = animateIn(nextSlide, dir);
+
+      gsap.timeline({
+        onComplete: () => {
+          // Hide previous after transition
+          prevSlide.classList.remove('active');
+          prevSlide.style.display = 'none';
+          prevSlide.style.visibility = 'hidden';
+          prevSlide.style.pointerEvents = 'none';
+          gsap.set(prevSlide, {clearProps:'all'});
+
+          // Lock in next
+          nextSlide.classList.add('active');
+          gsap.set(nextSlide, {clearProps:'x,opacity'});
+
+          index = next;
+          setActiveDot(index);
+          isAnimating = false;
+        }
+      }).add(outTl, 0).add(inTl, 0);
+    }
+
+    function goTo(i){
+      const count = slides.length;
+      const next = (i + count) % count;
+      const dir = (next > index || (index === count - 1 && next === 0)) ? 1 : -1;
+      show(next, dir);
+    }
+
+    const nextBtn = document.getElementById('nextBtn');
+    const prevBtn = document.getElementById('prevBtn');
+
+    function next(){ goTo(index + 1); }
+    function prev(){ goTo(index - 1); }
+
+    nextBtn.addEventListener('click', next);
+    prevBtn.addEventListener('click', prev);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') prev();
+    }, {passive:true});
+
+    // Initial entrance
+    gsap.from('.frame', {y:14, opacity:0, duration:.5, ease:'power2.out'});
+  </script>
+</body>
+</html>
